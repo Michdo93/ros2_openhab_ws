@@ -1,0 +1,6 @@
+string item_name
+string command
+# "ON", "OFF", "INCREASE", "DECREASE", "REFRESH", or "0"-"100"
+---
+bool success
+string message

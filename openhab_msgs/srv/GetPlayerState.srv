@@ -1,0 +1,5 @@
+string item_name
+---
+PlayerState state
+bool success
+string message

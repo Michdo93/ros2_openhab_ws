@@ -1,0 +1,5 @@
+string item_name
+---
+ImageState state
+bool success
+string message

@@ -1,0 +1,6 @@
+string item_name
+string command
+# "PLAY", "PAUSE", "NEXT", "PREVIOUS", "REWIND", "FASTFORWARD"
+---
+bool success
+string message

@@ -1,0 +1,6 @@
+string item_name
+string command
+# decimal value, optionally with unit e.g. "23.5 °C"
+---
+bool success
+string message

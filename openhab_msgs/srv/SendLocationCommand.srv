@@ -1,0 +1,6 @@
+string item_name
+string command
+# "lat,lon,alt" e.g. "48.858,2.294,35.0"
+---
+bool success
+string message

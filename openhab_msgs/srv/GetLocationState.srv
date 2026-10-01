@@ -1,0 +1,5 @@
+string item_name
+---
+LocationState state
+bool success
+string message

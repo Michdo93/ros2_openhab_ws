@@ -1,0 +1,5 @@
+string item_name
+---
+SwitchState state
+bool success
+string message

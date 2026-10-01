@@ -1,0 +1,6 @@
+string item_name
+string command
+# ISO 8601 datetime string
+---
+bool success
+string message

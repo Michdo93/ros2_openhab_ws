@@ -1,0 +1,7 @@
+std_msgs/Header header
+string item_name
+float32 hue
+float32 saturation
+float32 brightness
+# Command type: "ON", "OFF", "INCREASE", "DECREASE", "REFRESH", or HSB as above
+string command_type
