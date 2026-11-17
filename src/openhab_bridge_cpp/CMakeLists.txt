@@ -21,8 +21,9 @@ if(NOT OpenHABRestClientCpp_FOUND)
 endif()
 
 add_executable(openhab_bridge src/openhab_bridge.cpp)
-target_link_libraries(openhab_bridge openhab::rest_client_cpp)
-ament_target_dependencies(openhab_bridge rclcpp std_msgs diagnostic_msgs openhab_msgs)
+# Modern CMake targets – ament_target_dependencies() no longer exists in Lyrical
+target_link_libraries(openhab_bridge openhab::rest_client_cpp rclcpp::rclcpp
+  ${std_msgs_TARGETS} ${diagnostic_msgs_TARGETS} ${openhab_msgs_TARGETS})
 
 install(TARGETS openhab_bridge DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
