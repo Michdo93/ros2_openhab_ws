@@ -1,0 +1,7 @@
+# /openhab/send_command – send a command (or a state update) to one item
+string name
+string command
+bool update        # true: post as state update instead of a command
+---
+bool success
+string message

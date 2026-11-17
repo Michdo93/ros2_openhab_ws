@@ -1,0 +1,15 @@
+# Parameters of the openHAB bridge
+#   ros2 launch openhab_bridge_cpp bridge.launch.py
+#   ros2 run openhab_bridge_cpp openhab_bridge --ros-args --params-file config/bridge.yaml
+# OPENHAB_URL and OPENHAB_TOKEN are read from the environment, not from parameters.
+openhab_bridge:
+  ros__parameters:
+    # Which items are bridged: explicit names, members of groups, items with tags.
+    # All three empty ([""]): every item of openHAB.
+    items: ["Wohnzimmer_Licht", "Kueche_Rollladen"]
+    groups: [""]
+    tags: [""]
+    namespace: openhab          # topics below /openhab/items/<Item>/...
+    publish_value: true         # additionally std_msgs/Float64 on .../value (rqt_plot)
+    command_source: ros2        # shows up as source of the command in openHAB
+    reconnect_delay: 5.0        # seconds between attempts while openHAB is unreachable

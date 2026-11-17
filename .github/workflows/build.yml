@@ -1,0 +1,27 @@
+name: build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [jazzy, lyrical]
+    container: ros:${{ matrix.distro }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          apt-get update
+          apt-get install -y python3-pip python3-pytest libcurl4-openssl-dev git
+          pip3 install --break-system-packages python-openhab-rest-client
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/${{ matrix.distro }}/setup.bash
+          colcon build --event-handlers console_direct+
+      - name: Unit tests
+        shell: bash
+        run: |
+          source install/setup.bash
+          cd src/openhab_bridge && python3 -m pytest -q test

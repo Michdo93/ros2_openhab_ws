@@ -1,0 +1,10 @@
+# /openhab/list_items – list items known to openHAB (filters are optional)
+string type        # e.g. Switch; empty: all types
+string tags        # comma-separated tags, e.g. Lightbulb; empty: all
+---
+bool success
+string message
+string[] names
+string[] types
+string[] labels
+bool[] bridged     # true if the bridge publishes this item

@@ -1,318 +1,117 @@
-# ROS2 openHAB Integration
+# ros2_openhab_ws – openHAB ↔ ROS 2 bridge
 
-ROS2 Jazzy workspace for integrating openHAB with ROS2.  
-Uses [`python-openhab-rest-client`](https://github.com/Michdo93/python-openhab-rest-client) for REST and SSE communication.
+A ROS 2 workspace that connects [openHAB](https://www.openhab.org) items with the ROS 2 graph.
+openHAB states become topics, ROS 2 topics and services become commands – in Python
+([python-openhab-rest-client](https://github.com/Michdo93/python-openhab-rest-client)) and
+C++ ([cpp-openhab-rest-client](https://github.com/Michdo93/cpp-openhab-rest-client)) with
+identical topics and services.
 
----
+Tested with ROS 2 **Lyrical Luth** (Ubuntu 26.04) and **Jazzy Jalisco** (Ubuntu 24.04,
+Raspberry Pi 4/5) against openHAB 5.
 
-## Package Overview
+> **Version 2** replaces the one-message-type-per-item-type design of version 1
+> (`openhab_rest`, `openhab_events`, `openhab_cmd`, `openhab_static_examples`) with a single
+> bridge node and one generic `ItemState` message. Version 1 remains in the git history.
 
-| Package | Description |
+## Packages
+
+| Package | Content |
 |---|---|
-| `openhab_msgs` | `.msg` and `.srv` definitions for all openHAB item types |
-| `openhab_rest` | Service server nodes: GetState + SendCommand via REST API |
-| `openhab_events` | Publisher nodes: streams state changes via SSE (ItemStateChangedEvent) |
-| `openhab_static_examples` | Fixed example Subscriber + Client nodes per item type |
-| `openhab_cmd` | Generic CLI nodes: any item by parameter at runtime |
+| `openhab_msgs` | `ItemState`, `ItemCommand`, services `GetItem`, `SendCommand`, `ListItems` |
+| `openhab_bridge` | the bridge in Python (incl. `ros_inputs`: any ROS topic → item) |
+| `openhab_bridge_cpp` | the same bridge in C++ |
+| `openhab_examples` | `state_listener`, `presence_light`, a combined launch file |
 
----
-
-## Architecture
+## Topics and services
 
 ```
-openHAB Server
-    │
-    │  REST API (HTTP)
-    │◄─────────────────────────  openhab_rest_server
-    │                                 │ GetState / SendCommand
-    │                                 │ ROS2 Services
-    │                            ROS2 Service Clients
-    │
-    │  SSE (ItemStateChangedEvent)
-    │─────────────────────────►  openhab_event_publisher
-    │                                 │ /openhab/state/<ItemName>
-    │                                 │ ROS2 Topics (typed msgs)
-    │                            ROS2 Subscribers
-    │
-    │  REST API (sendCommand)
-    │◄─────────────────────────  openhab_cmd_bridge_subscriber
-                                      │ /openhab/command/<ItemName>
-                                      │ ROS2 Topics (Command msgs)
-                                 ROS2 Publishers
+openHAB ──SSE──► openhab_bridge ──► /openhab/items/<Item>/state    openhab_msgs/ItemState
+                                ──► /openhab/items/<Item>/value    std_msgs/Float64
+openHAB ◄─REST── openhab_bridge ◄── /openhab/items/<Item>/command  std_msgs/String
+                                ◄── /openhab/command               openhab_msgs/ItemCommand
+                                ◄── ros_inputs (any topic with a 'data' field, Python only)
+services: /openhab/get_item  /openhab/send_command  /openhab/list_items
+status:   /diagnostics (diagnostic_msgs/DiagnosticArray, every 5 s)
 ```
 
-### Data flows
-
-**Get state (one-shot):**
-```
-Client Node → Service Request (/openhab/get_state/<type>)
-           → openhab_rest_server → REST GET /rest/items/<n>/state
-           → Service Response with typed state message
-```
-
-**Send command (one-shot):**
-```
-Client Node → Service Request (/openhab/send_command/<type>)
-           → openhab_rest_server → REST POST /rest/items/<n>
-           → Service Response (success/message)
-```
-
-**SSE event stream (continuous, push from openHAB):**
-```
-openHAB item changes
-   → SSE ItemStateChangedEvent
-   → openhab_event_publisher
-   → /openhab/state/<ItemName>  [typed *State msg]
-   → Your subscriber node
-```
-
-**Continuous command push (ROS2 → openHAB):**
-```
-Your publisher node
-   → /openhab/command/<ItemName>  [typed *Command msg]
-   → openhab_cmd_bridge_subscriber
-   → REST POST /rest/items/<n>
-   → openHAB executes command
-```
-
----
-
-## Supported Item Types
-
-| openHAB Type | State Message | Command Message | GetState Service | SendCommand Service |
-|---|---|---|---|---|
-| Call | `CallState` | – | `GetCallState` | – |
-| Color | `ColorState` | `ColorCommand` | `GetColorState` | `SendColorCommand` |
-| Contact | `ContactState` | `ContactCommand` | `GetContactState` | `SendContactCommand` |
-| DateTime | `DateTimeState` | `DateTimeCommand` | `GetDateTimeState` | `SendDateTimeCommand` |
-| Dimmer | `DimmerState` | `DimmerCommand` | `GetDimmerState` | `SendDimmerCommand` |
-| Image | `ImageState` | – | `GetImageState` | – |
-| Location | `LocationState` | `LocationCommand` | `GetLocationState` | `SendLocationCommand` |
-| Number | `NumberState` | `NumberCommand` | `GetNumberState` | `SendNumberCommand` |
-| Player | `PlayerState` | `PlayerCommand` | `GetPlayerState` | `SendPlayerCommand` |
-| Rollershutter | `RollershutterState` | `RollershutterCommand` | `GetRollershutterState` | `SendRollershutterCommand` |
-| String | `StringState` | `StringCommand` | `GetStringState` | `SendStringCommand` |
-| Switch | `SwitchState` | `SwitchCommand` | `GetSwitchState` | `SendSwitchCommand` |
-
----
+* State topics use **reliable + transient local** QoS: a node that subscribes later still
+  receives the last state at once. Subscribers must request the same durability.
+* After a lost connection the bridge reconnects and publishes all states again, so no change
+  is lost.
+* `ItemState` carries the original state string plus a parsed `number` (Switch/Contact 1/0,
+  Dimmer and Rollershutter in percent, Number without unit, DateTime as Unix time), the
+  `unit` and `values` (Color: H, S, B; Location: latitude, longitude, altitude).
 
 ## Installation
 
-### Dependencies
-
 ```bash
-# ROS2 Jazzy base
-sudo apt install ros-jazzy-rclcpp ros-jazzy-rclpy
-
-# Build tools
-sudo apt install libcurl4-openssl-dev nlohmann-json3-dev
-
-# Python openHAB REST client (latest from GitHub)
-pip install python-openhab-rest-client
-# or for the newest async version:
-pip install git+https://github.com/Michdo93/python-openhab-rest-client.git
-```
-
-### Build
-
-```bash
-cd ~/ros2_openhab_ws
+sudo apt install python3-pip libcurl4-openssl-dev git
+pip install --break-system-packages python-openhab-rest-client   # Python bridge
+mkdir -p ~/ros2_ws && cd ~/ros2_ws
+git clone https://github.com/Michdo93/ros2_openhab_ws.git src/ros2_openhab_ws
+source /opt/ros/lyrical/setup.bash        # or jazzy
 colcon build --symlink-install
 source install/setup.bash
 ```
 
----
+The C++ bridge uses an installed cpp-openhab-rest-client (`find_package`) or fetches it from
+GitHub during the build. Skip it with `colcon build --packages-skip openhab_bridge_cpp`.
 
 ## Usage
 
-### 1. Start the REST Service Server
+Address and token come from the **environment**, never from parameters (every participant can
+read parameters with `ros2 param get`):
 
 ```bash
-# Python version
-ros2 run openhab_rest openhab_rest_server.py \
-    --ros-args \
-    -p openhab_url:=http://192.168.1.100:8080 \
-    -p openhab_token:=oh.openhab.YourTokenHere
-
-# C++ version
-ros2 run openhab_rest openhab_rest_server_cpp \
-    --ros-args \
-    -p openhab_url:=http://192.168.1.100:8080 \
-    -p openhab_token:=oh.openhab.YourTokenHere
-
-# With username/password instead of token
-ros2 run openhab_rest openhab_rest_server.py \
-    --ros-args \
-    -p openhab_url:=http://192.168.1.100:8080 \
-    -p openhab_user:=admin \
-    -p openhab_password:=yourpassword
+export OPENHAB_URL=http://openhab:8080
+export OPENHAB_TOKEN=oh.ros2.xxxxxxxx            # API token from the openHAB profile page
+ros2 launch openhab_bridge bridge.launch.py params:=my_bridge.yaml
+# or the C++ variant
+ros2 launch openhab_bridge_cpp bridge.launch.py params:=my_bridge.yaml
 ```
 
-### 2. Start the SSE Event Publisher
+`my_bridge.yaml`:
+
+```yaml
+openhab_bridge:
+  ros__parameters:
+    items: ["Wohnzimmer_Licht", "Kueche_Rollladen"]   # explicit items
+    groups: ["gROS"]                                 # plus all members of these groups
+    tags: [""]                                       # plus items with these tags
+    namespace: openhab
+    publish_value: true
+    command_source: ros2
+    reconnect_delay: 5.0
+    # Python bridge only: "topic|msg_type|item[|command|update]"
+    ros_inputs: ["/kinect/hand_detected|std_msgs/msg/Bool|Flur_Licht|command"]
+```
+
+`[""]` stands for an empty list (ROS 2 cannot declare an empty string array). If `items`,
+`groups` and `tags` are all empty, every item is bridged.
 
 ```bash
-# Python version
-ros2 run openhab_events openhab_event_publisher.py \
-    --ros-args \
-    -p openhab_url:=http://192.168.1.100:8080 \
-    -p openhab_token:=oh.openhab.YourTokenHere \
-    -p item_type_map:='{"LivingRoomLight":"Switch","Dimmer1":"Dimmer","Temp1":"Number","Color1":"Color"}'
-
-# C++ version
-ros2 run openhab_events openhab_event_publisher_cpp \
-    --ros-args \
-    -p openhab_url:=http://192.168.1.100:8080 \
-    -p openhab_token:=oh.openhab.YourTokenHere \
-    -p item_type_map:='{"LivingRoomLight":"Switch","Dimmer1":"Dimmer"}'
+ros2 topic echo /openhab/items/Wohnzimmer_Licht/state
+ros2 topic pub --once /openhab/items/Wohnzimmer_Licht/command std_msgs/msg/String "{data: 'ON'}"
+ros2 service call /openhab/send_command openhab_msgs/srv/SendCommand "{name: Wohnzimmer_Dimmer, command: '35'}"
+ros2 service call /openhab/get_item openhab_msgs/srv/GetItem "{name: Kueche_Rollladen}"
+ros2 service call /openhab/list_items openhab_msgs/srv/ListItems "{type: Switch}"
+ros2 run openhab_examples state_listener
 ```
 
-### 3. Query a state (generic)
+Quote `'ON'` and `'OFF'` in YAML – unquoted they are booleans and arrive as `True`/`False`.
+
+## Tests
 
 ```bash
-# Get Switch state
-ros2 run openhab_cmd openhab_get_state.py \
-    --ros-args -p item_name:=LivingRoomLight -p item_type:=Switch
-
-# Get Number state
-ros2 run openhab_cmd openhab_get_state.py \
-    --ros-args -p item_name:=RoomTemperature -p item_type:=Number
-
-# Get Color state
-ros2 run openhab_cmd openhab_get_state.py \
-    --ros-args -p item_name:=LivingRoomColor -p item_type:=Color
+cd src/openhab_bridge && python3 -m pytest -q test     # state conversion, no openHAB needed
 ```
 
-### 4. Send a command (generic)
+GitHub Actions builds all packages for Jazzy and Lyrical and runs the unit tests.
 
-```bash
-# Switch ON
-ros2 run openhab_cmd openhab_send_command.py \
-    --ros-args -p item_name:=LivingRoomLight -p item_type:=Switch -p command:=ON
+## Book
 
-# Dimmer to 75%
-ros2 run openhab_cmd openhab_send_command.py \
-    --ros-args -p item_name:=LivingRoomDimmer -p item_type:=Dimmer -p command:=75
-
-# Color (HSB)
-ros2 run openhab_cmd openhab_send_command.py \
-    --ros-args -p item_name:=LivingRoomColor -p item_type:=Color -p command:="120.0,100.0,100.0"
-
-# Rollershutter UP
-ros2 run openhab_cmd openhab_send_command.py \
-    --ros-args -p item_name:=BedroomBlind -p item_type:=Rollershutter -p command:=UP
-
-# Player PLAY
-ros2 run openhab_cmd openhab_send_command.py \
-    --ros-args -p item_name:=RadioPlayer -p item_type:=Player -p command:=PLAY
-```
-
-### 5. Subscribe to state changes (generic)
-
-```bash
-# Subscribe to a Switch item
-ros2 run openhab_cmd openhab_subscriber.py \
-    --ros-args -p item_name:=LivingRoomLight -p item_type:=Switch
-
-# Subscribe to a Number item
-ros2 run openhab_cmd openhab_subscriber.py \
-    --ros-args -p item_name:=RoomTemperature -p item_type:=Number
-```
-
-### 6. Publish commands to openHAB (push pipeline)
-
-Start the bridge subscriber (reads from ROS2 topic, sends to openHAB):
-```bash
-ros2 run openhab_cmd openhab_cmd_bridge_subscriber.py \
-    --ros-args \
-    -p item_name:=LivingRoomLight \
-    -p item_type:=Switch \
-    -p openhab_url:=http://192.168.1.100:8080 \
-    -p openhab_token:=oh.openhab.YourTokenHere
-```
-
-Then publish a command:
-```bash
-# One-shot
-ros2 run openhab_cmd openhab_publisher.py \
-    --ros-args -p item_name:=LivingRoomLight -p item_type:=Switch -p command:=ON
-
-# Continuous at 0.2 Hz
-ros2 run openhab_cmd openhab_publisher.py \
-    --ros-args \
-    -p item_name:=LivingRoomLight \
-    -p item_type:=Switch \
-    -p command:=ON \
-    -p publish_once:=false \
-    -p rate_hz:=0.2
-```
-
-### 7. Static example nodes
-
-```bash
-# Fixed subscriber examples (templates)
-ros2 run openhab_static_examples switch_subscriber.py
-ros2 run openhab_static_examples dimmer_subscriber.py
-ros2 run openhab_static_examples color_subscriber.py
-ros2 run openhab_static_examples number_subscriber.py
-# ... etc for all item types
-
-# Fixed GetState client examples
-ros2 run openhab_static_examples switch_get_state_client.py
-ros2 run openhab_static_examples number_get_state_client.py
-
-# Fixed SendCommand client examples
-ros2 run openhab_static_examples switch_send_command_client.py
-ros2 run openhab_static_examples dimmer_send_command_client.py
-```
-
----
-
-## Service and Topic Reference
-
-### ROS2 Services (provided by `openhab_rest_server`)
-
-| Service | Type | Description |
-|---|---|---|
-| `/openhab/get_state/call` | `GetCallState` | Get Call item state |
-| `/openhab/get_state/color` | `GetColorState` | Get Color item state |
-| `/openhab/get_state/contact` | `GetContactState` | Get Contact item state |
-| `/openhab/get_state/datetime` | `GetDateTimeState` | Get DateTime item state |
-| `/openhab/get_state/dimmer` | `GetDimmerState` | Get Dimmer item state |
-| `/openhab/get_state/image` | `GetImageState` | Get Image item state |
-| `/openhab/get_state/location` | `GetLocationState` | Get Location item state |
-| `/openhab/get_state/number` | `GetNumberState` | Get Number item state |
-| `/openhab/get_state/player` | `GetPlayerState` | Get Player item state |
-| `/openhab/get_state/rollershutter` | `GetRollershutterState` | Get Rollershutter state |
-| `/openhab/get_state/string` | `GetStringState` | Get String item state |
-| `/openhab/get_state/switch` | `GetSwitchState` | Get Switch item state |
-| `/openhab/send_command/color` | `SendColorCommand` | Send Color command |
-| `/openhab/send_command/contact` | `SendContactCommand` | Send Contact command |
-| `/openhab/send_command/datetime` | `SendDateTimeCommand` | Send DateTime command |
-| `/openhab/send_command/dimmer` | `SendDimmerCommand` | Send Dimmer command |
-| `/openhab/send_command/location` | `SendLocationCommand` | Send Location command |
-| `/openhab/send_command/number` | `SendNumberCommand` | Send Number command |
-| `/openhab/send_command/player` | `SendPlayerCommand` | Send Player command |
-| `/openhab/send_command/rollershutter` | `SendRollershutterCommand` | Send Rollershutter command |
-| `/openhab/send_command/string` | `SendStringCommand` | Send String command |
-| `/openhab/send_command/switch` | `SendSwitchCommand` | Send Switch command |
-
-### ROS2 Topics
-
-| Topic | Direction | Type | Description |
-|---|---|---|---|
-| `/openhab/state/<ItemName>` | openHAB → ROS2 | `*State` | State from SSE event publisher |
-| `/openhab/command/<ItemName>` | ROS2 → openHAB | `*Command` | Commands forwarded to openHAB REST |
-
----
-
-## Color Item Note
-
-openHAB Color items use **HSB** (Hue, Saturation, Brightness) both for state
-and commands, e.g. `"120.0,100.0,100.0"` for full green.
-The `ColorState` and `ColorCommand` messages carry all three float fields
-as well as the raw state string.
-
----
+The bridge is described in detail in *Smart Home & ROS2 – Vernetzen Sie Ihr Zuhause wie einen
+Roboter* by Michael Christian Dörflinger (Praxisreihe Smart Home).
 
 ## License
 

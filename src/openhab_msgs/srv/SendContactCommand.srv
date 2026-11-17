@@ -1,6 +1,0 @@
-string item_name
-string command
-# "OPEN", "CLOSED", "REFRESH"
----
-bool success
-string message

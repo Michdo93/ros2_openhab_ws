@@ -1,5 +1,0 @@
-string item_name
----
-RollershutterState state
-bool success
-string message

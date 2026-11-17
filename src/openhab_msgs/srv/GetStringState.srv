@@ -1,5 +1,0 @@
-string item_name
----
-StringState state
-bool success
-string message

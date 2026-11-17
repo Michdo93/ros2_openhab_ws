@@ -1,0 +1,6 @@
+# /openhab/get_item – read the current state of one item from openHAB
+string name
+---
+bool success
+string message
+ItemState item

@@ -1,5 +1,0 @@
-string item_name
----
-ColorState state
-bool success
-string message

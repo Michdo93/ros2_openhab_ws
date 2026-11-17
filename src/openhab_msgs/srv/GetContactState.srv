@@ -1,5 +1,0 @@
-string item_name
----
-ContactState state
-bool success
-string message
