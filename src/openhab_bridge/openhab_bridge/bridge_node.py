@@ -19,7 +19,6 @@ parameters, because every participant can read parameters with 'ros2 param get'.
 import importlib
 import os
 import threading
-import time
 
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
