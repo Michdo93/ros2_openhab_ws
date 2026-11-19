@@ -1,15 +1,19 @@
 """Print every state the bridge publishes – finds the topics on its own.
 
-    ros2 run openhab_examples state_listener
+ros2 run openhab_examples state_listener
 """
+
 import rclpy
 from openhab_msgs.msg import ItemState
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
-QOS = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
+QOS = QoSProfile(
+    depth=1,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+)
 
 
 class StateListener(Node):
@@ -20,9 +24,14 @@ class StateListener(Node):
 
     def discover(self):
         for topic, types in self.get_topic_names_and_types():
-            if topic.endswith("/state") and "openhab_msgs/msg/ItemState" in types \
-                    and topic not in self.subs:
-                self.subs[topic] = self.create_subscription(ItemState, topic, self.show, QOS)
+            if (
+                topic.endswith("/state")
+                and "openhab_msgs/msg/ItemState" in types
+                and topic not in self.subs
+            ):
+                self.subs[topic] = self.create_subscription(
+                    ItemState, topic, self.show, QOS
+                )
 
     def show(self, m):
         extra = f"  -> {m.number:g} {m.unit}".rstrip() if m.has_number else ""

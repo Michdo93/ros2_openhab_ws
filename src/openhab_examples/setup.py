@@ -20,8 +20,10 @@ setup(
     description="Examples for the openHAB bridge",
     license="MIT",
     tests_require=["pytest"],
-    entry_points={"console_scripts": [
-        "state_listener = openhab_examples.state_listener:main",
-        "presence_light = openhab_examples.presence_light:main",
-    ]},
+    entry_points={
+        "console_scripts": [
+            "state_listener = openhab_examples.state_listener:main",
+            "presence_light = openhab_examples.presence_light:main",
+        ]
+    },
 )

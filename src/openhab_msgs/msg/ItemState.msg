@@ -9,4 +9,5 @@ bool has_number    # true if "number" holds a valid value
 float64 number     # Switch/Contact: 1 or 0, Dimmer/Rollershutter: percent,
                    # Number: value without unit, Color: brightness, DateTime: Unix time in s
 string unit        # unit of a Number:<Dimension> item, e.g. °C, W, %
-float64[] values   # Color: hue, saturation, brightness; Location: latitude, longitude, altitude
+float64[] values   # Color: hue, saturation, brightness;
+                   # Location: latitude, longitude, altitude

@@ -51,8 +51,12 @@ def test_to_openhab():
 
 def test_parse_mapping():
     m = parse_mapping("/kinect/hand|std_msgs/msg/Bool|Flur_Hand")
-    assert m == {"topic": "/kinect/hand", "msg_type": "std_msgs/msg/Bool",
-                 "item": "Flur_Hand", "mode": "update"}
+    assert m == {
+        "topic": "/kinect/hand",
+        "msg_type": "std_msgs/msg/Bool",
+        "item": "Flur_Hand",
+        "mode": "update",
+    }
     assert parse_mapping("/a|std_msgs/msg/Bool|X|command")["mode"] == "command"
     with pytest.raises(ValueError):
         parse_mapping("/a|X")

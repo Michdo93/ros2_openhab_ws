@@ -21,7 +21,9 @@ setup(
     description="Bridge between openHAB and ROS 2",
     license="MIT",
     tests_require=["pytest"],
-    entry_points={"console_scripts": [
-        "openhab_bridge = openhab_bridge.bridge_node:main",
-    ]},
+    entry_points={
+        "console_scripts": [
+            "openhab_bridge = openhab_bridge.bridge_node:main",
+        ]
+    },
 )

@@ -1,11 +1,20 @@
 """Conversion between openHAB states and plain values – no ROS dependency, unit-tested."""
+
 import re
 from datetime import datetime
 
 NULL_STATES = ("NULL", "UNDEF")
 _NUMBER = re.compile(r"^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(.*?)\s*$")
-_ON_OFF = {"ON": 1.0, "OFF": 0.0, "OPEN": 1.0, "CLOSED": 0.0,
-           "PLAY": 1.0, "PAUSE": 0.0, "UP": 0.0, "DOWN": 100.0}
+_ON_OFF = {
+    "ON": 1.0,
+    "OFF": 0.0,
+    "OPEN": 1.0,
+    "CLOSED": 0.0,
+    "PLAY": 1.0,
+    "PAUSE": 0.0,
+    "UP": 0.0,
+    "DOWN": 100.0,
+}
 
 
 def base_type(item_type: str, group_type: str = "") -> str:
@@ -26,7 +35,11 @@ def parse_state(state: str, item_type: str = "String", group_type: str = "") -> 
         out["is_null"] = True
         return out
     kind = base_type(item_type, group_type)
-    if kind in ("Switch", "Contact", "Player") or state in _ON_OFF and kind == "Rollershutter":
+    if (
+        kind in ("Switch", "Contact", "Player")
+        or state in _ON_OFF
+        and kind == "Rollershutter"
+    ):
         if state in _ON_OFF:
             out.update(has_number=True, number=_ON_OFF[state])
         return out

@@ -16,6 +16,7 @@ Diagnostics
 Address and token come from the environment (OPENHAB_URL, OPENHAB_TOKEN) – never from
 parameters, because every participant can read parameters with 'ros2 param get'.
 """
+
 import importlib
 import os
 import threading
@@ -32,8 +33,11 @@ from std_msgs.msg import Float64, String
 
 from .state import parse_mapping, parse_state, to_openhab
 
-STATE_QOS = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                       durability=DurabilityPolicy.TRANSIENT_LOCAL)
+STATE_QOS = QoSProfile(
+    depth=1,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+)
 
 
 def _error(result):
@@ -65,9 +69,9 @@ class OpenHABBridge(Node):
         self.items_api = Items(self.client)
         self.url = url
 
-        self.types = {}          # item name -> (type, groupType)
-        self.state_pub = {}      # item name -> publisher ItemState
-        self.value_pub = {}      # item name -> publisher Float64
+        self.types = {}  # item name -> (type, groupType)
+        self.state_pub = {}  # item name -> publisher ItemState
+        self.value_pub = {}  # item name -> publisher Float64
         self.cmd_sub = []
         self.counters = {"events": 0, "commands": 0, "updates": 0, "errors": 0}
         self.connected = False
@@ -77,7 +81,9 @@ class OpenHABBridge(Node):
         for name in names:
             self._add_item(name)
 
-        self.create_subscription(ItemCommand, f"{self.ns}/command", self._on_item_command, 10)
+        self.create_subscription(
+            ItemCommand, f"{self.ns}/command", self._on_item_command, 10
+        )
         self.create_service(GetItem, f"{self.ns}/get_item", self._srv_get_item)
         self.create_service(SendCommand, f"{self.ns}/send_command", self._srv_send_command)
         self.create_service(ListItems, f"{self.ns}/list_items", self._srv_list_items)
@@ -89,7 +95,9 @@ class OpenHABBridge(Node):
 
         self._reader = threading.Thread(target=self._read_events, daemon=True)
         self._reader.start()
-        self.get_logger().info(f"bridge to {url}: {len(self.types)} items under {self.ns}/items")
+        self.get_logger().info(
+            f"bridge to {url}: {len(self.types)} items under {self.ns}/items"
+        )
 
     # ------------------------------------------------------------------ setup
     def _resolve(self, items, groups, tags):
@@ -120,9 +128,14 @@ class OpenHABBridge(Node):
         base = f"{self.ns}/items/{name}"
         self.state_pub[name] = self.create_publisher(ItemState, f"{base}/state", STATE_QOS)
         if self.publish_value:
-            self.value_pub[name] = self.create_publisher(Float64, f"{base}/value", STATE_QOS)
-        self.cmd_sub.append(self.create_subscription(
-            String, f"{base}/command", lambda m, n=name: self._send(n, m.data), 10))
+            self.value_pub[name] = self.create_publisher(
+                Float64, f"{base}/value", STATE_QOS
+            )
+        self.cmd_sub.append(
+            self.create_subscription(
+                String, f"{base}/command", lambda m, n=name: self._send(n, m.data), 10
+            )
+        )
         self._publish(name, data.get("state"))
         return True
 
@@ -156,7 +169,11 @@ class OpenHABBridge(Node):
         msg.name, msg.type, msg.state = name, item_type, "" if state is None else str(state)
         parsed = parse_state(msg.state, item_type, group_type)
         msg.is_null, msg.has_number = parsed["is_null"], parsed["has_number"]
-        msg.number, msg.unit, msg.values = parsed["number"], parsed["unit"], parsed["values"]
+        msg.number, msg.unit, msg.values = (
+            parsed["number"],
+            parsed["unit"],
+            parsed["values"],
+        )
         return msg
 
     def _publish(self, name, state):
@@ -220,8 +237,9 @@ class OpenHABBridge(Node):
         self._send(msg.name, msg.command, msg.update)
 
     def _srv_send_command(self, request, response):
-        response.success, response.message = self._send(request.name, request.command,
-                                                         request.update)
+        response.success, response.message = self._send(
+            request.name, request.command, request.update
+        )
         return response
 
     def _srv_get_item(self, request, response):
@@ -229,15 +247,17 @@ class OpenHABBridge(Node):
         if _error(data):
             response.success, response.message = False, _error(data)
             return response
-        self.types.setdefault(request.name, (data.get("type", "String"),
-                                             data.get("groupType", "")))
+        self.types.setdefault(
+            request.name, (data.get("type", "String"), data.get("groupType", ""))
+        )
         response.item = self._make_state(request.name, data.get("state"))
         response.success, response.message = True, "OK"
         return response
 
     def _srv_list_items(self, request, response):
-        data = self.items_api.getItems(type=request.type or None, tags=request.tags or None,
-                                       fields="name,type,label")
+        data = self.items_api.getItems(
+            type=request.type or None, tags=request.tags or None, fields="name,type,label"
+        )
         if _error(data):
             response.success, response.message = False, _error(data)
             return response
@@ -255,7 +275,8 @@ class OpenHABBridge(Node):
         status.level = DiagnosticStatus.OK if self.connected else DiagnosticStatus.ERROR
         status.message = "connected" if self.connected else "openHAB not reachable"
         status.values = [KeyValue(key="items", value=str(len(self.state_pub)))] + [
-            KeyValue(key=k, value=str(v)) for k, v in self.counters.items()]
+            KeyValue(key=k, value=str(v)) for k, v in self.counters.items()
+        ]
         array = DiagnosticArray(status=[status])
         array.header.stamp = self.get_clock().now().to_msg()
         self.diag_pub.publish(array)

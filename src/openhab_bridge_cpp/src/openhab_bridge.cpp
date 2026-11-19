@@ -5,8 +5,6 @@
 //   /openhab/command               openhab_msgs/ItemCommand
 //   /openhab/get_item, /openhab/send_command, /openhab/list_items, /diagnostics
 // Address and token come from OPENHAB_URL and OPENHAB_TOKEN (environment).
-#include <openhab/openhab.hpp>
-
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -15,6 +13,7 @@
 #include <iomanip>
 #include <map>
 #include <mutex>
+#include <openhab/openhab.hpp>
 #include <openhab_msgs/msg/item_command.hpp>
 #include <openhab_msgs/msg/item_state.hpp>
 #include <openhab_msgs/srv/get_item.hpp>
@@ -77,7 +76,8 @@ std::vector<double> splitNumbers(const std::string& s, bool& ok) {
 void parseState(ItemState& m, const std::string& groupType) {
     static const std::map<std::string, double> onOff = {
         {"ON", 1}, {"OFF", 0}, {"OPEN", 1}, {"CLOSED", 0}, {"PLAY", 1}, {"PAUSE", 0}};
-    static const std::regex number(R"(^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(.*?)\s*$)");
+    static const std::regex number(
+        R"(^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(.*?)\s*$)");
     const std::string& s = m.state;
     if (s.empty() || s == "NULL" || s == "UNDEF") {
         m.is_null = true;
@@ -94,7 +94,8 @@ void parseState(ItemState& m, const std::string& groupType) {
         auto values = splitNumbers(s, ok);
         if (!ok) return;
         m.values = values;
-        if (kind == "Color" && values.size() == 3) m.has_number = true, m.number = values[2];
+        if (kind == "Color" && values.size() == 3)
+            m.has_number = true, m.number = values[2];
         return;
     }
     if (kind == "DateTime") {
@@ -105,13 +106,15 @@ void parseState(ItemState& m, const std::string& groupType) {
         long offset = 0;  // "+0100" or "+01:00" after the seconds/fraction
         std::smatch z;
         if (std::regex_search(s, z, std::regex(R"(([+-])(\d\d):?(\d\d)$)")))
-            offset = (z[1] == "-" ? -1 : 1) * (std::stol(z[2]) * 3600 + std::stol(z[3]) * 60);
+            offset =
+                (z[1] == "-" ? -1 : 1) * (std::stol(z[2]) * 3600 + std::stol(z[3]) * 60);
         m.has_number = true;
         m.number = static_cast<double>(timegm(&tm) - offset);
         return;
     }
     std::smatch r;
-    if ((kind == "Number" || kind == "Dimmer" || kind == "Rollershutter" || kind == "String") &&
+    if ((kind == "Number" || kind == "Dimmer" || kind == "Rollershutter" ||
+         kind == "String") &&
         std::regex_match(s, r, number)) {
         m.has_number = true;
         m.number = std::stod(r[1]);
@@ -144,18 +147,21 @@ public:
             ns_ + "/command", 10,
             [this](const ItemCommand& m) { send(m.name, m.command, m.update); });
         getSrv_ = create_service<openhab_msgs::srv::GetItem>(
-            ns_ + "/get_item", [this](const std::shared_ptr<GetItem::Request> req,
-                                  std::shared_ptr<GetItem::Response> res) { getItem(*req, *res); });
+            ns_ + "/get_item",
+            [this](const std::shared_ptr<GetItem::Request> req,
+                   std::shared_ptr<GetItem::Response> res) { getItem(*req, *res); });
         sendSrv_ = create_service<openhab_msgs::srv::SendCommand>(
             ns_ + "/send_command", [this](const std::shared_ptr<SendCommand::Request> req,
-                                      std::shared_ptr<SendCommand::Response> res) {
+                                          std::shared_ptr<SendCommand::Response> res) {
                 std::tie(res->success, res->message) =
                     send(req->name, req->command, req->update);
             });
         listSrv_ = create_service<openhab_msgs::srv::ListItems>(
-            ns_ + "/list_items", [this](const std::shared_ptr<ListItems::Request> req,
-                                    std::shared_ptr<ListItems::Response> res) { listItems(*req, *res); });
-        diagPub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
+            ns_ + "/list_items",
+            [this](const std::shared_ptr<ListItems::Request> req,
+                   std::shared_ptr<ListItems::Response> res) { listItems(*req, *res); });
+        diagPub_ =
+            create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
         diagTimer_ = create_wall_timer(5s, [this] { publishDiagnostics(); });
 
         for (const char* k : {"events", "commands", "updates", "errors"}) counters_[k] = 0;
@@ -195,7 +201,8 @@ private:
                 for (const auto& i : data) wanted.push_back(i["name"]);
         }
         if (items.empty() && groups.empty() && tags.empty()) {
-            openhab::json data = items_.getItems(std::nullopt, std::nullopt, ".*", false, "name");
+            openhab::json data =
+                items_.getItems(std::nullopt, std::nullopt, ".*", false, "name");
             if (!openhab::isError(data))
                 for (const auto& i : data) wanted.push_back(i["name"]);
         }
@@ -217,7 +224,8 @@ private:
         auto qos = rclcpp::QoS(1).reliable().transient_local();
         std::string base = ns_ + "/items/" + name;
         statePub_[name] = create_publisher<ItemState>(base + "/state", qos);
-        if (publishValue_) valuePub_[name] = create_publisher<Float64>(base + "/value", qos);
+        if (publishValue_)
+            valuePub_[name] = create_publisher<Float64>(base + "/value", qos);
         commandSubs_.push_back(create_subscription<std_msgs::msg::String>(
             base + "/command", 10,
             [this, name](const std_msgs::msg::String& m) { send(name, m.data, false); }));
@@ -250,13 +258,15 @@ private:
     }
 
     void readEvents() {
-        openhab::OpenHABClient client(url_, std::nullopt, std::nullopt, token_);  // own client
+        openhab::OpenHABClient client(url_, std::nullopt, std::nullopt,
+                                      token_);  // own client
         openhab::Items items(client);
         openhab::ItemEvents events(client);
         while (!stop_ && rclcpp::ok()) {
             {
                 std::lock_guard<std::mutex> lock(streamMutex_);
-                stream_ = std::make_unique<openhab::EventStream>(events.ItemStateChangedEvent());
+                stream_ =
+                    std::make_unique<openhab::EventStream>(events.ItemStateChangedEvent());
             }
             if (stream_->isError()) {
                 setConnected(false, stream_->error());
@@ -283,8 +293,10 @@ private:
     }
 
     void wait() {
-        auto until = std::chrono::steady_clock::now() + std::chrono::duration<double>(delay_);
-        while (!stop_ && std::chrono::steady_clock::now() < until) std::this_thread::sleep_for(100ms);
+        auto until =
+            std::chrono::steady_clock::now() + std::chrono::duration<double>(delay_);
+        while (!stop_ && std::chrono::steady_clock::now() < until)
+            std::this_thread::sleep_for(100ms);
     }
 
     void setConnected(bool ok, const std::string& reason = "") {
@@ -321,8 +333,8 @@ private:
             res.message = openhab::errorMessage(data);
             return;
         }
-        types_.emplace(req.name,
-                       std::make_pair(data.value("type", "String"), data.value("groupType", "")));
+        types_.emplace(req.name, std::make_pair(data.value("type", "String"),
+                                                data.value("groupType", "")));
         res.item = makeState(req.name, data.value("state", ""));
         res.success = true;
         res.message = "OK";
@@ -345,7 +357,8 @@ private:
         for (const auto& [name, i] : sorted) {
             res.names.push_back(name);
             res.types.push_back(i.value("type", ""));
-            res.labels.push_back(i.contains("label") && i["label"].is_string() ? i["label"] : "");
+            res.labels.push_back(i.contains("label") && i["label"].is_string() ? i["label"]
+                                                                               : "");
             res.bridged.push_back(statePub_.count(name) > 0);
         }
         res.success = true;
