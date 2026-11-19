@@ -198,9 +198,11 @@ class OpenHABBridge(Node):
                 self._publish(name, state)
 
     def _set_connected(self, ok, reason=""):
-        if ok != self.connected:
-            log = self.get_logger().info if ok else self.get_logger().warn
-            log("connected to openHAB" if ok else f"openHAB not reachable: {reason}")
+        # rclpy allows only one severity per call site – hence two separate calls
+        if ok and not self.connected:
+            self.get_logger().info("connected to openHAB")
+        elif not ok and self.connected:
+            self.get_logger().warn(f"openHAB not reachable: {reason}")
         self.connected = ok
 
     # ------------------------------------------------------------------ ROS -> openHAB
