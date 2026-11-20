@@ -49,6 +49,22 @@ def test_to_openhab():
     assert to_openhab(42, "Dimmer") == "42"
 
 
+def test_numbers_integer_and_float():
+    # Ganzzahl und Fließkommazahl: der Text bleibt exakt, keine Rundung
+    assert to_openhab(1, "Number") == "1"
+    assert to_openhab(1.12, "Number") == "1.12"
+    assert to_openhab(1.23456789012, "Number") == "1.23456789012"
+    assert to_openhab(True, "Number") == "1"
+    assert parse_state("1", "Number")["number"].is_integer()
+    assert not parse_state("1.12", "Number")["number"].is_integer()
+
+
+def test_dimensionless_and_units():
+    assert parse_state("45 %", "Number:Dimensionless")["unit"] == "%"
+    assert parse_state("650 ppm", "Number:Dimensionless")["number"] == 650.0
+    assert parse_state("3.5 kW", "Number:Power")["unit"] == "kW"
+
+
 def test_parse_mapping():
     m = parse_mapping("/kinect/hand|std_msgs/msg/Bool|Flur_Hand")
     assert m == {

@@ -70,11 +70,13 @@ def to_openhab(value, item_type: str = "String") -> str:
     if isinstance(value, bool):
         if kind == "Contact":
             return "OPEN" if value else "CLOSED"
-        if kind in ("Dimmer", "Rollershutter", "Number"):
+        if kind in ("Dimmer", "Rollershutter"):
             return "100" if value else "0"
+        if kind == "Number":
+            return "1" if value else "0"
         return "ON" if value else "OFF"
     if isinstance(value, float):
-        return f"{value:g}"
+        return repr(value)  # shortest exact text: 1.12 stays 1.12, no rounding
     return str(value)
 
 
