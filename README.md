@@ -113,6 +113,11 @@ GitHub Actions builds all packages for Jazzy and Lyrical and runs the unit tests
 The bridge is described in detail in *Smart Home & ROS2 – Vernetzen Sie Ihr Zuhause wie einen
 Roboter* by Michael Christian Dörflinger (Praxisreihe Smart Home).
 
+## Support
+
+If this repository helps you, you can buy the author a coffee:
+https://buymeacoffee.com/Michdo93
+
 ## License
 
 MIT
